@@ -6,12 +6,11 @@ async def data_agent(state: MFAdvisorState) -> MFAdvisorState:
     """
     Data Agent — Node 1 in the LangGraph pipeline.
 
-    Responsibilities:
-    - Read user risk level from state
-    - Fetch a universe of relevant mutual funds from MFAPI
-    - Write fund_universe back to state
-
-    Does NOT compute any metrics — that is Analyst Agent's job.
+    Track A changes:
+    - Now uses AMFI NAVAll.txt for proper SEBI category filtering
+      instead of keyword matching on scheme names
+    - Funds now have real AUM (where available) and
+      category-level expense ratio proxy
     """
     state["current_step"] = "data_agent"
 
@@ -20,11 +19,16 @@ async def data_agent(state: MFAdvisorState) -> MFAdvisorState:
         funds = await fetch_funds_for_risk(risk_level, max_funds=80)
 
         if not funds:
-            state["errors"].append("data_agent: No funds fetched. MFAPI may be down.")
+            state["errors"].append(
+                "data_agent: No funds fetched. AMFI or MFAPI may be down."
+            )
             state["fund_universe"] = []
         else:
             state["fund_universe"] = funds
-            print(f"[data_agent] Fetched {len(funds)} funds for risk level: {risk_level}")
+            print(
+                f"[data_agent] {len(funds)} funds fetched "
+                f"for risk='{risk_level}' using SEBI categories"
+            )
 
     except Exception as e:
         state["errors"].append(f"data_agent: {str(e)}")

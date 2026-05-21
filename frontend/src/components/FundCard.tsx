@@ -19,6 +19,12 @@ function fmt(val: number | null, decimals = 2): string {
   return val.toFixed(decimals);
 }
 
+function inr(val: number | null): string {
+  if (val === null) return "N/A";
+  if (val >= 1000) return `₹${(val / 1000).toFixed(1)}K Cr`;
+  return `₹${val.toFixed(0)} Cr`;
+}
+
 const CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#3b82f6", "#ec4899"];
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -37,7 +43,6 @@ function categoryBadge(category: string): string {
   return CATEGORY_COLORS.default;
 }
 
-// Return info for positive/negative CAGR colouring
 function cagrColor(val: number | null): string {
   if (val === null) return "text-gray-400";
   return val >= 0 ? "text-emerald-600" : "text-rose-600";
@@ -46,8 +51,6 @@ function cagrColor(val: number | null): string {
 export default function FundCard({ fund, rank }: Props) {
   const [expanded, setExpanded] = useState(false);
   const chartColor = CHART_COLORS[(rank - 1) % CHART_COLORS.length];
-
-  // Determine 1Y return direction for chart label
   const returnPositive = fund.cagr_1y === null || fund.cagr_1y >= 0;
 
   return (
@@ -56,7 +59,6 @@ export default function FundCard({ fund, rank }: Props) {
       <div className="px-6 pt-5 pb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
-            {/* Rank badge */}
             <div
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white text-sm font-semibold"
               style={{ backgroundColor: chartColor }}
@@ -72,17 +74,17 @@ export default function FundCard({ fund, rank }: Props) {
               </p>
             </div>
           </div>
-          {/* Category pill */}
           <span
             className={`shrink-0 text-xs font-medium px-2.5 py-0.5 rounded-full border ${categoryBadge(fund.category)}`}
           >
             {fund.category
               .replace("Equity Scheme - ", "")
-              .replace("Hybrid Scheme - ", "")}
+              .replace("Hybrid Scheme - ", "")
+              .replace("Debt Scheme - ", "")}
           </span>
         </div>
 
-        {/* Metrics row */}
+        {/* Returns metrics */}
         <div className="mt-4 grid grid-cols-5 gap-2 text-center">
           {[
             {
@@ -118,6 +120,30 @@ export default function FundCard({ fund, rank }: Props) {
               </p>
             </div>
           ))}
+        </div>
+
+        {/* Fund details row — expense ratio + AUM (Track A data) */}
+        <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+          <span className="flex items-center gap-1">
+            <span className="text-gray-400">Expense ratio</span>
+            <span className="font-medium text-gray-700">
+              {fund.expense_ratio !== null ? `${fund.expense_ratio}%` : "N/A"}
+            </span>
+          </span>
+          <span className="text-gray-200">|</span>
+          <span className="flex items-center gap-1">
+            <span className="text-gray-400">AUM</span>
+            <span className="font-medium text-gray-700">
+              {inr(fund.aum_cr)}
+            </span>
+          </span>
+          <span className="text-gray-200">|</span>
+          <span className="flex items-center gap-1">
+            <span className="text-gray-400">Score</span>
+            <span className="font-medium text-gray-700">
+              {(fund.score * 100).toFixed(1)}
+            </span>
+          </span>
         </div>
       </div>
 

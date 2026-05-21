@@ -12,6 +12,8 @@ export interface FundRecommendation {
   cagr_5y: number | null;
   sharpe_ratio: number | null;
   volatility: number | null;
+  expense_ratio: number | null;
+  aum_cr: number | null;
   score: number;
   explanation: string;
   nav_history: NavPoint[];
@@ -20,6 +22,8 @@ export interface FundRecommendation {
 export interface RecommendResponse {
   recommendations: FundRecommendation[];
   errors: string[];
+  critic_feedback: string[];
+  critic_iterations: number;
   total_funds_analysed: number;
 }
 
@@ -35,6 +39,7 @@ export type AgentKey =
   | "data_agent"
   | "analyst_agent"
   | "recommendation_agent"
+  | "critic_agent"
   | "explainer_agent";
 
 export type AgentStatus = "idle" | "running" | "done";
@@ -44,4 +49,5 @@ export interface AgentStep {
   label: string;
   description: string;
   status: AgentStatus;
+  iteration?: number;
 }

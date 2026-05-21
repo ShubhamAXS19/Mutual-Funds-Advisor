@@ -6,20 +6,20 @@ from dataclasses import dataclass, field
 class UserProfile:
     age: int
     monthly_sip: float          # INR
-    horizon_years: int          # investment horizon
+    horizon_years: int
     risk_level: str             # "low" | "medium" | "high"
-    goal: str                   # e.g. "wealth creation", "retirement"
+    goal: str
 
 
 @dataclass
 class FundData:
     scheme_code: str
     scheme_name: str
-    category: str               # Equity, Debt, Hybrid, etc.
-    sub_category: str           # Large Cap, Mid Cap, etc.
-    aum_cr: Optional[float]     # AUM in crores
+    category: str               # SEBI category string
+    sub_category: str           # risk level: "low" | "medium" | "high"
+    aum_cr: Optional[float]
     expense_ratio: Optional[float]
-    nav_history: list[dict]     # [{"date": "2024-01-01", "nav": 123.45}, ...]
+    nav_history: list[dict]     # [{"date": "...", "nav": 123.45}, ...]
 
 
 @dataclass
@@ -28,26 +28,25 @@ class ScoredFund:
     cagr_1y: Optional[float]
     cagr_3y: Optional[float]
     cagr_5y: Optional[float]
-    volatility: Optional[float]     # annualised std dev of daily returns
-    sharpe_ratio: Optional[float]   # simplified: cagr_3y / volatility
-    score: float                    # composite score for ranking
+    volatility: Optional[float]
+    sharpe_ratio: Optional[float]
+    score: float
 
 
 class MFAdvisorState(TypedDict):
     # Input
     user_profile: UserProfile
 
-    # Data agent output
+    # Agent outputs
     fund_universe: list[FundData]
-
-    # Analyst agent output
     scored_funds: list[ScoredFund]
-
-    # Recommendation agent output
     recommended_funds: list[ScoredFund]
+    explanation: dict               # {scheme_code: str}
 
-    # Explainer agent output
-    explanation: dict               # {scheme_code: "why this fund" string}
+    # Critic fields (Track C)
+    critic_feedback: list[str]      # rejection reasons from critic
+    critic_approved: bool           # True = proceed to explainer
+    critic_iterations: int          # loop counter — max 2
 
     # Meta
     errors: list[str]
