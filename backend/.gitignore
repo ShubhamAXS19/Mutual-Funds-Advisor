@@ -1,2 +1,159 @@
-/venv
+# ============================================
+# Python / FastAPI / Agentic AI Backend
+# ============================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
 .env
+.venv
+venv/
+ENV/
+env/
+
+# Python tooling
+pip-wheel-metadata/
+poetry.lock
+Pipfile.lock
+
+# FastAPI / Uvicorn
+*.log
+uvicorn.log
+
+# Environment variables & secrets
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.crt
+
+# AI / LLM related
+models/
+checkpoints/
+embeddings/
+vectorstore/
+faiss_index/
+chroma/
+weaviate_data/
+qdrant_storage/
+llama_index/
+.cache/
+huggingface/
+hf_cache/
+transformers_cache/
+openai_cache/
+
+# ML experiment tracking
+mlruns/
+wandb/
+tensorboard/
+runs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Type checking / linting
+.mypy_cache/
+.pyre/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Docker
+docker-compose.override.yml
+
+# Kubernetes
+*.kubeconfig
+
+# Database files
+*.db
+*.sqlite3
+
+# Redis dump
+dump.rdb
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Logs
+logs/
+*.log
+
+# Coverage reports
+coverage.xml
+*.cover
+
+# Node.js frontend (if fullstack)
+node_modules/
+.next/
+dist-frontend/
+
+# Generated files
+generated/
+artifacts/
+
+# API keys / credentials
+credentials.json
+service-account.json
+
+# Terraform / Infra
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Local configs
+local_settings.py
+config.local.yaml
+config.local.json
