@@ -1,6 +1,26 @@
 version: "3.9"
-
+ 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mfadvisor
+      POSTGRES_PASSWORD: mfadvisor
+      POSTGRES_DB: mfadvisor
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+ 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+ 
   backend:
     build: ./backend
     ports:
@@ -9,4 +29,26 @@ services:
       - .env
     volumes:
       - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+ 
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - postgres
+      - redis
+    command: npm run dev
+ 
+volumes:
+  postgres_data:
+  redis_data:

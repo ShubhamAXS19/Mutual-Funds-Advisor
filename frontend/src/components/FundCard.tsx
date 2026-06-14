@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { FundRecommendation } from "@/types";
 import NavChart from "./NavChart";
 
@@ -48,10 +49,47 @@ function cagrColor(val: number | null): string {
   return val >= 0 ? "text-emerald-600" : "text-rose-600";
 }
 
+type ExplainView = "hidden" | "summary" | "bullets";
+
 export default function FundCard({ fund, rank }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [explainView, setExplainView] = useState<ExplainView>("hidden");
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const { data: session } = useSession();
+
+  async function saveToWatchlist() {
+    if (!session) {
+      window.location.href = "/auth/signin";
+      return;
+    }
+    setSaving(true);
+    try {
+      await fetch("/api/watchlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schemeCode: fund.scheme_code,
+          schemeName: fund.scheme_name,
+          category: fund.category,
+          sipAmount: 0,
+        }),
+      });
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  }
   const chartColor = CHART_COLORS[(rank - 1) % CHART_COLORS.length];
   const returnPositive = fund.cagr_1y === null || fund.cagr_1y >= 0;
+  const hasBullets = fund.bullets && fund.bullets.length > 0;
+
+  function toggleView(view: ExplainView) {
+    setExplainView((prev) => (prev === view ? "hidden" : view));
+  }
+
+  // Last bullet is caveat — style differently
+  const reasonBullets = hasBullets ? fund.bullets.slice(0, -1) : [];
+  const caveat = hasBullets ? fund.bullets[fund.bullets.length - 1] : null;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
@@ -84,7 +122,7 @@ export default function FundCard({ fund, rank }: Props) {
           </span>
         </div>
 
-        {/* Returns metrics */}
+        {/* Metrics */}
         <div className="mt-4 grid grid-cols-5 gap-2 text-center">
           {[
             {
@@ -122,7 +160,7 @@ export default function FundCard({ fund, rank }: Props) {
           ))}
         </div>
 
-        {/* Fund details row — expense ratio + AUM (Track A data) */}
+        {/* Fund details row */}
         <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
           <span className="flex items-center gap-1">
             <span className="text-gray-400">Expense ratio</span>
@@ -164,23 +202,76 @@ export default function FundCard({ fund, rank }: Props) {
         </div>
       )}
 
-      {/* Explanation */}
-      <div className="px-6 pb-5 pt-2 border-t border-gray-50">
-        <button
-          className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors mt-2 mb-2"
-          onClick={() => setExpanded(!expanded)}
-        >
-          <span>{expanded ? "Hide" : "Why this fund?"}</span>
-          <span
-            className={`transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+      {/* Explanation toggle row */}
+      <div className="px-6 pb-5 pt-3 border-t border-gray-50">
+        <div className="flex items-center gap-2">
+          {/* Summary toggle */}
+          <button
+            onClick={() => toggleView("summary")}
+            className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-all duration-150
+              ${
+                explainView === "summary"
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+              }`}
           >
-            ↓
-          </span>
-        </button>
-        {expanded && (
-          <p className="text-sm text-gray-600 leading-relaxed bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+            <span>📝</span>
+            <span>Summary</span>
+          </button>
+
+          {/* Bullets toggle */}
+          {hasBullets && (
+            <button
+              onClick={() => toggleView("bullets")}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-all duration-150
+                ${
+                  explainView === "bullets"
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                }`}
+            >
+              <span>✦</span>
+              <span>Why this fund?</span>
+            </button>
+          )}
+        </div>
+
+        {/* Summary view */}
+        {explainView === "summary" && (
+          <div className="mt-3 text-sm text-gray-600 leading-relaxed bg-indigo-50 rounded-xl p-4 border border-indigo-100">
             {fund.explanation}
-          </p>
+          </div>
+        )}
+
+        {/* Bullets view */}
+        {explainView === "bullets" && hasBullets && (
+          <div className="mt-3 bg-indigo-50 rounded-xl p-4 border border-indigo-100 space-y-2">
+            {/* Reason bullets */}
+            <ul className="space-y-2">
+              {reasonBullets.map((bullet, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2.5 text-sm text-gray-700"
+                >
+                  <span
+                    className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white text-xs font-bold"
+                    style={{ backgroundColor: chartColor }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="leading-snug">{bullet}</span>
+                </li>
+              ))}
+            </ul>
+
+            {/* Caveat — last bullet, styled differently */}
+            {caveat && (
+              <div className="mt-3 pt-3 border-t border-indigo-100 flex items-start gap-2">
+                <span className="text-amber-500 text-sm mt-0.5">⚠</span>
+                <p className="text-xs text-amber-700 leading-snug">{caveat}</p>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

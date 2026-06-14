@@ -12,7 +12,7 @@ const INITIAL_STEPS: AgentStep[] = [
   {
     key: "data_agent",
     label: "Data agent",
-    description: "Fetching mutual fund universe from MFAPI",
+    description: "Fetching mutual fund universe from AMFI + MFAPI",
     status: "idle",
   },
   {
@@ -25,6 +25,12 @@ const INITIAL_STEPS: AgentStep[] = [
     key: "recommendation_agent",
     label: "Recommendation agent",
     description: "Filtering top 5 funds for your profile",
+    status: "idle",
+  },
+  {
+    key: "critic_agent",
+    label: "Critic agent",
+    description: "Validating recommendations against policy rules",
     status: "idle",
   },
   {
@@ -42,17 +48,31 @@ export default function Home() {
   const [steps, setSteps] = useState<AgentStep[]>(INITIAL_STEPS);
   const [results, setResults] = useState<FundRecommendation[]>([]);
   const [totalAnalysed, setTotalAnalysed] = useState(0);
+  const [criticFeedback, setCriticFeedback] = useState<string[]>([]);
+  const [criticIterations, setCriticIterations] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  function updateStep(key: AgentKey, status: AgentStep["status"]) {
-    setSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status } : s)));
+  function updateStep(
+    key: AgentKey,
+    status: AgentStep["status"],
+    iteration?: number,
+  ) {
+    setSteps((prev) =>
+      prev.map((s) =>
+        s.key === key
+          ? { ...s, status, ...(iteration ? { iteration } : {}) }
+          : s,
+      ),
+    );
   }
 
   async function handleSubmit(p: UserProfile) {
     setProfile(p);
     setSteps(INITIAL_STEPS);
     setResults([]);
+    setCriticFeedback([]);
+    setCriticIterations(0);
     setScreen("loading");
 
     try {
@@ -69,6 +89,7 @@ export default function Home() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let eventType = ""; // persists across chunk reads — fixes split data: lines
 
       while (true) {
         const { done, value } = await reader.read();
@@ -78,7 +99,6 @@ export default function Home() {
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
 
-        let eventType = "";
         for (const line of lines) {
           if (line.startsWith("event: ")) {
             eventType = line.slice(7).trim();
@@ -86,16 +106,24 @@ export default function Home() {
             const payload = JSON.parse(line.slice(6));
 
             if (eventType === "agent_start") {
-              updateStep(payload.agent as AgentKey, "running");
+              updateStep(
+                payload.agent as AgentKey,
+                "running",
+                payload.iteration,
+              );
             } else if (eventType === "agent_done") {
               updateStep(payload.agent as AgentKey, "done");
             } else if (eventType === "complete") {
               setResults(payload.recommendations);
               setTotalAnalysed(payload.total_funds_analysed);
+              setCriticFeedback(payload.critic_feedback ?? []);
+              setCriticIterations(payload.critic_iterations ?? 0);
               setScreen("results");
             } else if (eventType === "error") {
               throw new Error(payload.message);
             }
+
+            eventType = ""; // reset only after consuming a data line
           }
         }
       }
@@ -109,28 +137,25 @@ export default function Home() {
     setScreen("form");
     setSteps(INITIAL_STEPS);
     setResults([]);
+    setCriticFeedback([]);
     setErrorMsg("");
   }
 
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 py-12">
-        {/* FORM */}
         {screen === "form" && (
           <ProfileForm onSubmit={handleSubmit} loading={false} />
         )}
 
-        {/* LOADING — agent tracker */}
         {screen === "loading" && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
             <AgentTracker steps={steps} />
           </div>
         )}
 
-        {/* RESULTS */}
         {screen === "results" && (
           <div>
-            {/* Results header */}
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">
@@ -149,13 +174,39 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Agent tracker — collapsed/done state */}
+            {/* Agent tracker — all done */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
               <AgentTracker
                 steps={steps.map((s) => ({ ...s, status: "done" }))}
                 totalFunds={totalAnalysed}
+                criticIterations={criticIterations}
               />
             </div>
+
+            {/* Critic feedback — only show if issues were flagged */}
+            {criticFeedback.length > 0 && (
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-amber-600 text-sm font-semibold">
+                    ⚠ Critic agent notes
+                  </span>
+                  <span className="text-xs text-amber-500">
+                    {criticIterations} validation loop(s) ran
+                  </span>
+                </div>
+                <ul className="space-y-1">
+                  {criticFeedback.map((fb, i) => (
+                    <li
+                      key={i}
+                      className="text-xs text-amber-700 flex items-start gap-1.5"
+                    >
+                      <span className="mt-0.5 shrink-0">•</span>
+                      <span>{fb}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Fund cards */}
             <div className="space-y-4">
@@ -171,7 +222,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* ERROR */}
         {screen === "error" && (
           <div className="bg-white rounded-2xl border border-rose-100 shadow-sm p-8 text-center">
             <div className="text-4xl mb-4">⚠️</div>

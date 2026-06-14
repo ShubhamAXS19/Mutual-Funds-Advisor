@@ -1,4 +1,5 @@
 import os
+import json
 from groq import AsyncGroq
 from graph.state import MFAdvisorState, ScoredFund
 
@@ -7,11 +8,9 @@ MODEL = "llama-3.1-8b-instant"
 
 
 def build_fund_summary(sf: ScoredFund) -> str:
-    """Build a compact data string for the LLM to reason about."""
     def pct(val):
         return f"{val * 100:.1f}%" if val is not None else "N/A"
 
-    # Track A: expense ratio and AUM now have real values
     expense = f"{sf.fund.expense_ratio}%" if sf.fund.expense_ratio else "N/A"
     aum = f"₹{sf.fund.aum_cr:.0f} Cr" if sf.fund.aum_cr else "N/A"
 
@@ -27,9 +26,7 @@ def build_fund_summary(sf: ScoredFund) -> str:
 
 
 def build_prompt(sf: ScoredFund, user_profile) -> str:
-    fund_summary = build_fund_summary(sf)
-
-    return f"""You are a SEBI-registered financial advisor assistant helping an Indian retail investor choose mutual funds for a monthly SIP.
+    return f"""You are a SEBI-registered financial advisor assistant helping an Indian retail investor choose mutual funds.
 
 User profile:
 - Age: {user_profile.age}
@@ -39,36 +36,61 @@ User profile:
 - Goal: {user_profile.goal}
 
 Fund data:
-{fund_summary}
+{build_fund_summary(sf)}
 
-Write a 3–4 sentence plain English explanation of why this fund suits this investor.
-Mention at least one specific number from the fund data (e.g. 3Y return, Sharpe ratio, or expense ratio).
-Focus on: return consistency, risk level vs user profile, and fit for their horizon and goal.
-Do NOT use jargon. Do NOT make guarantees about future returns.
-End with one honest caveat specific to this fund's data (e.g. high volatility, short track record, sector concentration).
+Respond ONLY with a valid JSON object in this exact format (no markdown, no preamble):
+{{
+  "summary": "3-4 sentence plain English explanation of why this fund suits this investor. Mention at least one specific number. Do not make guarantees about future returns.",
+  "bullets": [
+    "Reason 1 — specific and data-backed",
+    "Reason 2 — specific and data-backed",
+    "Reason 3 — specific and data-backed",
+    "One honest caveat or risk specific to this fund"
+  ]
+}}
+
+Rules:
+- summary: flowing prose, no bullet points, no jargon
+- bullets: exactly 4 items, each starting with a short bold label followed by an em dash
+- Do NOT include markdown formatting inside the JSON strings
+- The last bullet must be a caveat or risk warning
 """
 
 
-async def explain_fund(sf: ScoredFund, user_profile) -> str:
-    """Call Groq to generate a rationale for a single fund."""
+async def explain_fund(sf: ScoredFund, user_profile) -> dict:
+    """Call Groq and return {summary, bullets}. Falls back gracefully on parse error."""
     prompt = build_prompt(sf, user_profile)
 
     response = await client.chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,
-        max_tokens=300,
+        max_tokens=500,
     )
-    return response.choices[0].message.content.strip()
+
+    raw = response.choices[0].message.content.strip()
+
+    # Strip markdown fences if model adds them despite instructions
+    raw = raw.replace("```json", "").replace("```", "").strip()
+
+    try:
+        parsed = json.loads(raw)
+        return {
+            "summary": parsed.get("summary", raw),
+            "bullets": parsed.get("bullets", []),
+        }
+    except json.JSONDecodeError:
+        # Fallback — return the raw text as summary, no bullets
+        return {
+            "summary": raw,
+            "bullets": [],
+        }
 
 
 async def explainer_agent(state: MFAdvisorState) -> MFAdvisorState:
     """
     Explainer Agent — Node 4 in the LangGraph pipeline.
-
-    Track A changes:
-    - Prompt now includes real expense ratio and AUM data
-    - LLM can reference these in the rationale
+    Now returns structured {summary, bullets} per fund.
     """
     state["current_step"] = "explainer_agent"
 
@@ -85,9 +107,11 @@ async def explainer_agent(state: MFAdvisorState) -> MFAdvisorState:
             explanation = await explain_fund(sf, user_profile)
             explanations[sf.fund.scheme_code] = explanation
         except Exception as e:
-            explanations[sf.fund.scheme_code] = f"Explanation unavailable: {str(e)}"
+            explanations[sf.fund.scheme_code] = {
+                "summary": f"Explanation unavailable: {str(e)}",
+                "bullets": [],
+            }
 
     state["explanation"] = explanations
     print(f"[explainer_agent] Generated explanations for {len(explanations)} funds.")
-
     return state

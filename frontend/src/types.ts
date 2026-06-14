@@ -16,6 +16,7 @@ export interface FundRecommendation {
   aum_cr: number | null;
   score: number;
   explanation: string;
+  bullets: string[];
   nav_history: NavPoint[];
 }
 

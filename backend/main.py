@@ -49,6 +49,7 @@ class FundRecommendation(BaseModel):
     aum_cr: float | None
     score: float
     explanation: str
+    bullets: list[str]
     nav_history: list[NavPoint]
 
 
@@ -91,7 +92,8 @@ def build_recommendations(state: MFAdvisorState) -> list[dict]:
             "expense_ratio": sf.fund.expense_ratio,
             "aum_cr":        sf.fund.aum_cr,
             "score":         sf.score,
-            "explanation":   state["explanation"].get(sf.fund.scheme_code, ""),
+            "explanation":   state["explanation"].get(sf.fund.scheme_code, {}).get("summary", "") if isinstance(state["explanation"].get(sf.fund.scheme_code), dict) else state["explanation"].get(sf.fund.scheme_code, ""),
+                    "bullets":       state["explanation"].get(sf.fund.scheme_code, {}).get("bullets", []) if isinstance(state["explanation"].get(sf.fund.scheme_code), dict) else [],
             "nav_history":   nav_slice,
         })
     return recs
@@ -250,7 +252,8 @@ async def recommend(body: RecommendRequest):
             expense_ratio=sf.fund.expense_ratio,
             aum_cr=sf.fund.aum_cr,
             score=sf.score,
-            explanation=state["explanation"].get(sf.fund.scheme_code, ""),
+            explanation=state["explanation"].get(sf.fund.scheme_code, {}).get("summary", "") if isinstance(state["explanation"].get(sf.fund.scheme_code), dict) else state["explanation"].get(sf.fund.scheme_code, ""),
+            bullets=state["explanation"].get(sf.fund.scheme_code, {}).get("bullets", []) if isinstance(state["explanation"].get(sf.fund.scheme_code), dict) else [],
             nav_history=[NavPoint(date=p["date"], nav=p["nav"]) for p in nav_slice],
         ))
 
