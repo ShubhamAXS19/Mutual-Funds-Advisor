@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 load_dotenv()
-
+import os 
 import json
 import asyncio
 from fastapi import FastAPI, HTTPException
@@ -12,9 +12,12 @@ from graph.pipeline import run_pipeline
 
 app = FastAPI(title="MF Advisor API", version="0.1.0")
 
+_allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")
+ALLOWED_ORIGINS = [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
